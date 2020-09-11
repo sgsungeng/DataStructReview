@@ -15,12 +15,13 @@
 #include <queue> // 打印调试时使用
 #include <string> // 打印二叉树时使用
 
-
+/* 红黑树 */
 template <class Key, class Compare = std::less<Key> >
 class RBTree{
 private:
-    enum Color{Red=0,Black=1};
+    enum Color{Red=0,Black=1}; /*颜色定义*/
 public:
+    /*红黑树节点*/
     class RBTreeNode{
     public:
         RBTreeNode *left;
@@ -35,12 +36,36 @@ public:
             if(parent) delete parent;
         }
     };
+    /*插入方法，主要处理红红冲突，当出现红红冲突时
+     * 1。如果叔叔节点存在且为红，直接改变颜色，叔叔和父亲为黑，爷爷为红，自己为红。
+     * 否则旋转。
+     * 1。红红在左左 右旋
+     * 2。红红在左右 左旋 右旋
+     * 3。红红在右右 左旋
+     * 4。红红在右左 右旋 左旋*/
     void insert(Key k);
 
-    /// 依照层次打印
+    /*依照层次打印 挺好看的*/
     void printRBTree();
-    /// 删除节点
+    /*删除节点
+     * 删除阶段
+     * 1。当删除的节点拥有两个子节点时需要找到替代节点（前驱或者后继）转换为2或者3
+     * 2。当删除节点有子节点，用子节点代替，删除当前节点并调节
+     * 2。1 删除节点时红色时不用管
+     * 2。2 当删除节点是黑色时，后面节点必然是红色，由红黑树的删除必然是删除2-3-4树的叶子节点可知，直接将替代节点改为红色
+     * 3。当删除节点是没有子节点时，
+     * 3。1 如果是红色则，直接删除
+     * 3。2 如果是黑色需要兄弟节点帮忙
+     *    首先查找兄弟节点，如果兄弟节点是红色，则该节点不是兄弟节点(左右节点必然存在，且为黑色)，是2-3-4树的上一层节点。
+     *    需要旋转一次，如果当前节点在左则左旋，在右则右旋，并改变颜色，则该兄弟节点会旋转为爷爷节点，并且真正的兄弟节点得到
+     *    这时需要判断兄弟能否帮忙，如果兄弟有红色的子节点则可以帮忙，只有黑色，或者没有则不能
+     *    3。2。1  如果可以帮忙，则旋转（node在左 左旋，反之亦然）即可达到左右平衡
+     *    3。2。2  如果不可以帮忙，则需要设置兄弟节点为红色，使以父节点为根的子树达到平衡，设置需要调节的节点为父节点，
+     *    并再一次向兄弟借。
+     *    */
     void deleteKey(Key k);
+    /*查找*/
+    RBTreeNode *find(Key k);
 private:
     RBTreeNode *root = nullptr;
     Compare cmp = Compare();
@@ -68,10 +93,9 @@ private:
     /*删除后调整*/
     void adjustAfterDelete(RBTreeNode *node);
 };
-
-
 template <class Key, class Compare>
-void RBTree<Key,Compare>::deleteKey(Key k){
+typename RBTree<Key,Compare>::RBTreeNode *
+ RBTree<Key,Compare>::find(Key k) {
     RBTreeNode *node = root;
     while(node){
         if(node->k == k){
@@ -82,57 +106,108 @@ void RBTree<Key,Compare>::deleteKey(Key k){
             node = node->right;
         }
     }
+    return node;
+}
+
+template <class Key, class Compare>
+void RBTree<Key,Compare>::deleteKey(Key k){
+    RBTreeNode *node = find(k);
     if(node == nullptr) return;
     if(node->left && node->right){
         auto next = findNext(node);
         node->k = next->k;
         node = next;
     }
-    if(node->color == Red){
-        if(node->left){
-            node->left->parent = node->parent;
-            if(node->parent) {
-                if(node == node->parent->left){
-                    node->parent->left = node->left;
-                }else {
-                    node->parent->right = node->left;
-                }
-                node->parent = nullptr;
-            }
-            node->left = nullptr;
-            delete node;
-        }else if(node->right) {
-            node->right->parent = node->parent;
-            if(node->parent) {
-                if(node == node->parent->left){
-                    node->parent->left = node->right;
-                }else {
-                    node->parent->right = node->right;
-                }
-                node->parent = nullptr;
-            }
-            node->right = nullptr;
-            delete node;
+    RBTreeNode * replaceNode = node->left?node->left:node->right; // 查找替代者
+    if(replaceNode){// 如果替代者存在，则替代
+        replaceNode->parent = node->parent;
+        if(node->parent == nullptr){
+            root = replaceNode;
+        }else if(node == node->parent->left){
+            node->parent->left = replaceNode;
         }else{
-            if(node == node->parent->left){
-                node->parent->left = nullptr;
-            }else{
-                node->parent->left = nullptr;
-            }
-            node->parent = nullptr;
+            node->parent->right = replaceNode;
         }
+        node->parent = node->left = node->right = nullptr;
+        if(node->color == Black) adjustAfterDelete(replaceNode); // replaceNode 一定是红色
+        delete node;
+    }else if (node->parent == nullptr){ // 如果该节点没有代替节点，且该节点是根节点
+        root = nullptr;
+        delete node;
     }else{
-        adjustAfterDelete(node);
+        // 叶子节点，且不为根节点
+        if(node->color == Black) adjustAfterDelete(node);
+        if(node->parent){
+            if(node == node->parent->left)node->parent->left = nullptr;
+            else if(node == node->parent->right) node->parent->right = nullptr;
+        }
+        node->parent = nullptr;
+        delete node;
     }
+
 }
 
 /*删除后调整*/
 template <class Key, class Compare>
 void RBTree<Key,Compare>::adjustAfterDelete(RBTreeNode *node){
-    if (node->parent){
-        
-    }
 
+    while(node != root && node->color == Black){
+        // 只能找兄弟
+        if(node == node->parent->left){
+            RBTreeNode *b = node->parent->right;
+            if(b->color == Red){
+                b->color = Black;
+                node->parent->color = Red;
+                leftRotate(node->parent);
+                b = node->parent->right;
+            }
+            if((b->left && b->left->color == Red)||(b->right && b->right->color == Red)){
+                // 当兄弟的孩子里面有兄弟能借
+                if(b->right == nullptr || b->right->color == Black){
+                    b->color = Red;
+                    b->left->color = Black;
+                    rightRotate(b);
+                    b = node->parent->right;
+                }
+                b->color = node->parent->color;
+                node->parent->color = Black;
+                b->right->color = Black;
+                leftRotate(node->parent);
+                node = root;
+            }else{
+                b->color = Red;
+                node = node->parent;
+            }
+
+        }else{
+            RBTreeNode *b = node->parent->left;
+            if(b->color == Red){
+                b->color = Black;
+                node->parent->color = Red;
+                rightRotate(node->parent);
+                b = node->parent->left;
+            }
+            if((b->right && b->right->color == Red)||(b->left && b->left->color == Red)){
+                // 当兄弟的孩子里面有兄弟能借
+                if(b->left == nullptr || b->left->color == Black){
+                    b->color = Red;
+                    b->right->color = Black;
+                    leftRotate(b);
+                    b = node->parent->left;
+                }
+                b->color = node->parent->color;
+                node->parent->color = Black;
+                b->left->color = Black;
+                rightRotate(node->parent);
+                node = root;
+            }else{
+                b->color = Red;
+                node = node->parent;
+            }
+        }
+    }
+    //  自己能搞定， 即本身是红色或者有红色能够代替。
+    node->color = Black;
 
 
 }
@@ -260,7 +335,14 @@ RBTree<Key,Compare>::adjustAfterInsert(RBTreeNode *node){
     root->color = Black;
 }
 
-
+int pow(int n, int p){
+    int re = 1;
+    while(p > 0){
+        re *= n;
+        --p;
+    }
+    return re;
+}
 
 template <class Key,class Compare>
 void RBTree<Key,Compare>::printRBTree(){
@@ -274,22 +356,30 @@ void RBTree<Key,Compare>::printRBTree(){
     int depth = getDepth(node);
     std::queue<RBTreeNode *>que;
     que.push(node);
+    int i = 0;
     while (depth) {
+        std::string sep;
+        std::string str((pow(2,depth -1) - 1) * 2 ,' ');
+
+        std::cout<<str;
         int size = (int)que.size();
+        str = std::string((pow(2,depth) - 1) * 2, ' ');
         while(size){
             RBTreeNode *node = que.front();
             que.pop();
             if(node == nullptr){
 
-                std::cout<<"-"<<" ";
+                std::cout<<""<<"--"<<str;
                 que.push(nullptr);
                 que.push(nullptr);
             }else{
                 if(node->color == Red){
-                    std::cout<<_RED<<node->k<<" "<<_RESET;
-//                    printf("\033[31m %d ",node->k);
+//                    std::cout<<_RED<<node->k<<" "<<_RESET;
+                    printf("\033[31m%02d%s\033[0m",node->k,str.data());
+
                 }else{
-                    std::cout<<node->k<<" ";
+//                    std::cout<<node->k<<" ";
+                    printf("%02d%s",node->k,str.data());
                 }
                 que.push(node->left);
                 que.push(node->right);
