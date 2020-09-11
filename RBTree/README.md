@@ -1,5 +1,10 @@
 
 # 红黑树复习
+红黑树显示网址。[https://www.cs.usfca.edu/~galles/visualization/RedBlack.html](https://www.cs.usfca.edu/~galles/visualization/RedBlack.html)
+
+本人为了调试方便也实现了红黑树打印,样式如下：
+
+![](./RBTreePrint.png)  
 
 ## 插入方法，主要处理红红冲突，当出现红红冲突时
 ### 如果叔叔节点存在且为红。

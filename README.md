@@ -1,5 +1,4 @@
 #本项目主要记录数据结构复习
 
-1.当前正在进行中的是红黑树，红黑树的删除操作还有问题
+1.当前完成[红黑树](./RBTree/README.md)
 
-https://www.cs.usfca.edu/~galles/visualization/RedBlack.html
